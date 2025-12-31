@@ -1,199 +1,152 @@
-//
-//  RevealView.swift
-//  imposter
-//
-//  Created by Thiago  dos Santos Gomes on 26/12/25.
-//
-
 import SwiftUI
 
 struct RevealView: View {
     @ObservedObject var viewModel: GameViewModel
     @State private var isPressed: Bool = false
+    @State private var hasFinishedRevealing: Bool = false // Trava de segurança
 
     var body: some View {
         ZStack {
-            // Background - Cor diferente para cada jogador
+            // Background que muda com o jogador
             LinearGradient(
                 colors: viewModel.getCurrentPlayerColors(),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
-            .animation(.easeInOut(duration: 0.3), value: viewModel.currentPlayerIndex)
 
-            VStack(spacing: 40) {
-                // Player Info Header
-                VStack(spacing: 10) {
-                    if let player = viewModel.currentPlayer {
-                        Text(player.displayName)
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                    } else {
-                        Text("Jogador \(viewModel.currentPlayerIndex + 1)")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                    }
+            VStack(spacing: 15) {
+                
+                // --- HEADER COMPACTO ---
+                VStack(spacing: 4) {
+                    Text(viewModel.currentPlayer?.displayName ?? "Jogador \(viewModel.currentPlayerIndex + 1)")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
 
-                    Text("de \(viewModel.numberOfPlayers)")
-                        .font(.system(size: 18, weight: .regular, design: .rounded))
-                        .foregroundColor(.white.opacity(0.7))
+                    Text("\(viewModel.currentPlayerIndex + 1) de \(viewModel.numberOfPlayers)")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
                 }
-                .padding(.top, 60)
+                .padding(.top, 20)
 
-                Spacer()
+                Spacer(minLength: 10)
 
-                // Main Reveal Card - LONG PRESS APENAS AQUI
+                // --- CARD PRINCIPAL ---
                 ZStack {
-                    RoundedRectangle(cornerRadius: 30)
+                    RoundedRectangle(cornerRadius: 25)
                         .fill(Color(.systemBackground))
-                        .shadow(radius: 20)
+                        .shadow(radius: 15)
 
-                    VStack(spacing: 30) {
-                        // Icon
-                        Image(systemName: viewModel.isWordRevealed ?
-                              (viewModel.isCurrentPlayerImpostor ? "exclamationmark.triangle.fill" : "eye.fill") :
-                                "eye.slash.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(viewModel.isWordRevealed ?
-                                           (viewModel.isCurrentPlayerImpostor ? .red : .blue) : .gray)
-                            .animation(.spring(response: 0.3), value: viewModel.isWordRevealed)
-
-                        // Word or Impostor Message
-                        if viewModel.isWordRevealed {
-                            if viewModel.isCurrentPlayerImpostor {
-                                VStack(spacing: 15) {
-                                    Text("🎭")
-                                        .font(.system(size: 70))
-
-                                    Text("Você é o")
-                                        .font(.title2)
-                                        .foregroundColor(.secondary)
-
-                                    Text("IMPOSTOR!")
-                                        .font(.system(size: 40, weight: .black, design: .rounded))
-                                        .foregroundColor(.red)
-
-                                    Text("Tente se misturar")
-                                        .font(.body)
-                                        .foregroundColor(.secondary)
-                                        .padding(.top, 5)
-                                }
-                                .transition(.scale.combined(with: .opacity))
-                            } else {
-                                VStack(spacing: 15) {
-                                    Text("Sua palavra é:")
-                                        .font(.title2)
-                                        .foregroundColor(.secondary)
-
-                                    Text(viewModel.getWordForCurrentPlayer())
-                                        .font(.system(size: 48, weight: .black, design: .rounded))
-                                        .foregroundColor(.blue)
-                                        .multilineTextAlignment(.center)
-
-                                    Text("Memorize e passe para o próximo")
-                                        .font(.body)
-                                        .foregroundColor(.secondary)
-                                        .multilineTextAlignment(.center)
-                                        .padding(.top, 5)
-                                }
-                                .transition(.scale.combined(with: .opacity))
+                    VStack(spacing: 20) {
+                        if hasFinishedRevealing {
+                            // ESTADO 3: Já viu e foi bloqueado
+                            VStack(spacing: 15) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 60))
+                                    .foregroundColor(.green)
+                                
+                                Text("Papel Memorizado!")
+                                    .font(.title2).bold()
+                                
+                                Text("Passe o dispositivo para o próximo jogador.")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
                             }
+                            .transition(.scale)
+                            
+                        } else if viewModel.isWordRevealed {
+                            // ESTADO 2: Revelando (Segurando)
+                            revealContent
+                                .transition(.opacity)
                         } else {
+                            // ESTADO 1: Instrução inicial
                             VStack(spacing: 15) {
                                 Text("Segure para revelar")
-                                    .font(.title)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.primary)
-
+                                    .font(.headline)
+                                
                                 Image(systemName: "hand.tap.fill")
-                                    .font(.system(size: 50))
+                                    .font(.system(size: 40))
                                     .foregroundColor(.gray)
                                     .symbolEffect(.bounce, value: isPressed)
+                                
+                                Text("Atenção: Você só pode ver uma vez!")
+                                    .font(.caption2)
+                                    .foregroundColor(.red)
                             }
                         }
                     }
-                    .padding(40)
+                    .padding(25)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 400)
+                .frame(height: 320) // Altura reduzida para caber em telas menores
                 .padding(.horizontal, 30)
                 .scaleEffect(isPressed ? 0.95 : 1.0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
-                // APLICAR LONG PRESS APENAS NO CARD
+                .animation(.spring(), value: isPressed)
+                // GESTO COM TRAVA
                 .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { pressing in
-                    if pressing {
-                        isPressed = true
-                        viewModel.revealWord()
-                    } else {
-                        isPressed = false
-                        viewModel.hideWord()
+                    if !hasFinishedRevealing { // Só permite se não tiver terminado
+                        isPressed = pressing
+                        if pressing {
+                            viewModel.revealWord()
+                            viewModel.triggerHaptic(.medium)
+                        } else {
+                            viewModel.hideWord()
+                            hasFinishedRevealing = true // ATIVA A TRAVA AO SOLTAR
+                            viewModel.triggerHaptic(.heavy)
+                        }
                     }
                 }, perform: {})
 
-                Spacer()
+                Spacer(minLength: 10)
 
-                // Instructions
-                VStack(spacing: 15) {
-                    if !viewModel.isWordRevealed {
-                        HStack(spacing: 10) {
-                            Image(systemName: "hand.raised.fill")
-                                .foregroundColor(.white)
-                            Text("Pressione e segure o card acima")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                        }
-                        .padding()
-                        .background(
-                            Capsule()
-                                .fill(Color.black.opacity(0.3))
-                        )
-                    } else {
-                        HStack(spacing: 10) {
-                            Image(systemName: "hand.point.down.fill")
-                                .foregroundColor(.white)
-                            Text("Solte e clique em 'Próximo Jogador'")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                        }
-                        .padding()
-                        .background(
-                            Capsule()
-                                .fill(Color.black.opacity(0.3))
-                        )
-                    }
-                }
-
-                // Next Player Button (only visible when word is hidden)
-                if !viewModel.isWordRevealed {
+                // --- BOTÃO PRÓXIMO ---
+                // Só aparece após a trava ser ativada
+                if hasFinishedRevealing {
                     Button(action: {
+                        hasFinishedRevealing = false // Reseta a trava para o próximo
                         viewModel.nextPlayer()
                     }) {
                         HStack {
                             Text("Próximo Jogador")
-                                .font(.title3)
-                                .fontWeight(.bold)
-                            Image(systemName: "arrow.right.circle.fill")
-                                .font(.title2)
+                            Image(systemName: "chevron.right.circle.fill")
                         }
+                        .font(.headline)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.white.opacity(0.3))
-                        )
+                        .background(Color.black.opacity(0.3))
+                        .cornerRadius(15)
                     }
                     .padding(.horizontal, 30)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
-                Spacer()
+                Spacer(minLength: 20)
+            }
+        }
+        .animation(.default, value: hasFinishedRevealing)
+    }
+
+    // Conteúdo da revelação (Impostor ou Palavra)
+    @ViewBuilder
+    private var revealContent: some View {
+        if viewModel.isCurrentPlayerImpostor {
+            VStack(spacing: 10) {
+                Text("🎭").font(.system(size: 50))
+                Text("Você é o").font(.headline).foregroundColor(.secondary)
+                Text("IMPOSTOR")
+                    .font(.system(size: 38, weight: .black, design: .rounded))
+                    .foregroundColor(.red)
+            }
+        } else {
+            VStack(spacing: 10) {
+                Text("Sua palavra é:").font(.headline).foregroundColor(.secondary)
+                Text(viewModel.getWordForCurrentPlayer())
+                    .font(.system(size: 38, weight: .black, design: .rounded))
+                    .foregroundColor(.blue)
+                    .multilineTextAlignment(.center)
             }
         }
     }
 }
-
-#Preview {
-    RevealView(viewModel: GameViewModel())
-}
-

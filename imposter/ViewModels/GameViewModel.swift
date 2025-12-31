@@ -12,6 +12,7 @@ class GameViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var gameState: GameState = .setup
     @Published var numberOfPlayers: Int = 5
+    @Published var numberOfImpostors: Int = 1
     @Published var selectedCategory: Category = .comida
     @Published var players: [Player] = []
     @Published var currentPlayerIndex: Int = 0
@@ -21,7 +22,7 @@ class GameViewModel: ObservableObject {
     @Published var playerNames: [String] = []
 
     // MARK: - Private Properties
-    private var impostorIndex: Int = 0
+    private var impostorIndices: Set<Int> = []
     private var secretWord: String = ""
     private var timer: Timer?
 
@@ -32,13 +33,17 @@ class GameViewModel: ObservableObject {
     }
 
     var isCurrentPlayerImpostor: Bool {
-        return currentPlayerIndex == impostorIndex
+        return impostorIndices.contains(currentPlayerIndex)
     }
 
     var formattedTime: String {
         let minutes = discussionTimeRemaining / 60
         let seconds = discussionTimeRemaining % 60
         return String(format: "%02d:%02d", minutes, seconds)
+    }
+
+    var maxImpostors: Int {
+        return max(1, numberOfPlayers - 1)
     }
 
     // MARK: - Game Setup
@@ -51,8 +56,16 @@ class GameViewModel: ObservableObject {
         currentPlayerIndex = 0
         isWordRevealed = false
 
-        // Sortear impostor e palavra
-        impostorIndex = Int.random(in: 0..<numberOfPlayers)
+        // Sortear impostores - garantir que há impostores suficientes mas não todos
+        let maxImpostors = max(1, numberOfPlayers - 1)
+        let actualImpostors = min(numberOfImpostors, maxImpostors)
+
+        var indices = Set<Int>()
+        while indices.count < actualImpostors {
+            indices.insert(Int.random(in: 0..<numberOfPlayers))
+        }
+        impostorIndices = indices
+
         secretWord = selectedCategory.words.randomElement() ?? ""
 
         // Mudar para estado de revelação

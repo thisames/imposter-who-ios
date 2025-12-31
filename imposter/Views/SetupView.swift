@@ -1,19 +1,13 @@
-//
-//  SetupView.swift
-//  imposter
-//
-//  Created by Thiago  dos Santos Gomes on 26/12/25.
-//
-
 import SwiftUI
 
 struct SetupView: View {
     @ObservedObject var viewModel: GameViewModel
+    @State private var showingNameEditor = false // Controle para o modal de nomes
 
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background gradient
+                // Background
                 LinearGradient(
                     colors: [Color.blue.opacity(0.6), Color.purple.opacity(0.6)],
                     startPoint: .topLeading,
@@ -21,269 +15,174 @@ struct SetupView: View {
                 )
                 .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: 30) {
-                        // Header
-                        VStack(spacing: 10) {
-                            Image(systemName: "person.fill.questionmark")
-                                .font(.system(size: 80))
-                                .foregroundColor(.white)
+                VStack(spacing: 15) {
+                    // Header mais compacto
+                    VStack(spacing: 5) {
+                        Image(systemName: "person.fill.questionmark")
+                            .font(.system(size: 50)) // Reduzido de 80
+                            .foregroundColor(.white)
 
-                            Text("IMPOSTOR")
-                                .font(.system(size: 48, weight: .black, design: .rounded))
-                                .foregroundColor(.white)
+                        Text("IMPOSTOR")
+                            .font(.system(size: 32, weight: .black, design: .rounded)) // Reduzido de 48
+                            .foregroundColor(.white)
+                    }
+                    .padding(.top, 10)
 
-                            Text("Descubra quem está mentindo")
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.9))
-                        }
-                        .padding(.top, 40)
-
-                        // Configuration Card
-                    VStack(spacing: 25) {
-                        // Number of Players
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Número de Jogadores")
+                    // Configuration Card
+                    VStack(spacing: 15) { // Espaçamento interno reduzido
+                        
+                        // Jogadores
+                        VStack(spacing: 8) {
+                            Text("Jogadores: \(viewModel.numberOfPlayers)")
                                 .font(.headline)
-                                .foregroundColor(.primary)
+                            
+                            HStack {
+                                stepperButton(systemName: "minus.circle.fill", enabled: viewModel.numberOfPlayers > 3) {
+                                    viewModel.numberOfPlayers -= 1
+                                    viewModel.triggerHaptic(.light)
+                                }
+                                
+                                Slider(value: Binding(
+                                    get: { Double(viewModel.numberOfPlayers) },
+                                    set: { viewModel.numberOfPlayers = Int($0) }
+                                ), in: 3...12, step: 1)
+                                .accentColor(.blue)
+                                
+                                stepperButton(systemName: "plus.circle.fill", enabled: viewModel.numberOfPlayers < 12) {
+                                    viewModel.numberOfPlayers += 1
+                                    viewModel.triggerHaptic(.light)
+                                }
+                            }
+                        }
+
+                        Divider()
+
+                        // Impostores
+                        VStack(spacing: 8) {
+                            Text("Impostores: \(viewModel.numberOfImpostors)")
+                                .font(.headline)
 
                             HStack {
-                                Button(action: {
-                                    if viewModel.numberOfPlayers > 3 {
-                                        viewModel.numberOfPlayers -= 1
-                                        if viewModel.useCustomNames {
-                                            viewModel.updatePlayerNames()
-                                        }
-                                        viewModel.triggerHaptic(.light)
-                                    }
-                                }) {
-                                    Image(systemName: "minus.circle.fill")
-                                        .font(.system(size: 32))
-                                        .foregroundColor(viewModel.numberOfPlayers > 3 ? .blue : .gray)
+                                stepperButton(systemName: "minus.circle.fill", enabled: viewModel.numberOfImpostors > 1) {
+                                    viewModel.numberOfImpostors -= 1
+                                    viewModel.triggerHaptic(.light)
                                 }
-                                .disabled(viewModel.numberOfPlayers <= 3)
 
-                                Spacer()
-
-                                Text("\(viewModel.numberOfPlayers)")
-                                    .font(.system(size: 48, weight: .bold, design: .rounded))
-                                    .foregroundColor(.primary)
-                                    .frame(width: 100)
-
-                                Spacer()
-
-                                Button(action: {
-                                    if viewModel.numberOfPlayers < 12 {
-                                        viewModel.numberOfPlayers += 1
-                                        if viewModel.useCustomNames {
-                                            viewModel.updatePlayerNames()
-                                        }
-                                        viewModel.triggerHaptic(.light)
+                                Slider(value: Binding(
+                                    get: { Double(viewModel.numberOfImpostors) },
+                                    set: { viewModel.numberOfImpostors = Int($0) }
+                                ), in: 1...Double(viewModel.maxImpostors), step: 1)
+                                .accentColor(.red)
+                                .onChange(of: viewModel.numberOfPlayers) { _ in
+                                    // Ajustar número de impostores se exceder o máximo
+                                    if viewModel.numberOfImpostors > viewModel.maxImpostors {
+                                        viewModel.numberOfImpostors = viewModel.maxImpostors
                                     }
-                                }) {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.system(size: 32))
-                                        .foregroundColor(viewModel.numberOfPlayers < 12 ? .blue : .gray)
                                 }
-                                .disabled(viewModel.numberOfPlayers >= 12)
+
+                                stepperButton(systemName: "plus.circle.fill", enabled: viewModel.numberOfImpostors < viewModel.maxImpostors) {
+                                    viewModel.numberOfImpostors += 1
+                                    viewModel.triggerHaptic(.light)
+                                }
                             }
-
-                            Text("Mínimo: 3 | Máximo: 12")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .center)
                         }
 
                         Divider()
 
-                        // Custom Names Toggle
-                        VStack(alignment: .leading, spacing: 15) {
-                            Toggle(isOn: $viewModel.useCustomNames) {
-                                HStack(spacing: 10) {
-                                    Image(systemName: "person.text.rectangle.fill")
-                                        .font(.title3)
-                                        .foregroundColor(.blue)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Nomes Personalizados")
-                                            .font(.headline)
-                                        Text("Adicione nomes aos jogadores")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                            }
-                            .onChange(of: viewModel.useCustomNames) { newValue in
-                                if newValue {
-                                    viewModel.updatePlayerNames()
-                                }
-                                viewModel.triggerHaptic(.light)
-                            }
-
+                        // Nomes Personalizados - Agora um simples botão se ativo
+                        HStack {
+                            Toggle("Nomes Personalizados", isOn: $viewModel.useCustomNames)
+                                .font(.subheadline).bold()
+                            
                             if viewModel.useCustomNames {
-                                VStack(spacing: 12) {
-                                    Text("Digite os nomes abaixo:")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                                    ScrollView {
-                                        VStack(spacing: 12) {
-                                            ForEach(0..<viewModel.numberOfPlayers, id: \.self) { index in
-                                                HStack(spacing: 12) {
-                                                    ZStack {
-                                                        Circle()
-                                                            .fill(playerColor(for: index).opacity(0.2))
-                                                            .frame(width: 40, height: 40)
-                                                        Text("\(index + 1)")
-                                                            .font(.headline)
-                                                            .foregroundColor(playerColor(for: index))
-                                                    }
-
-                                                    TextField("Ex: João", text: Binding(
-                                                        get: {
-                                                            if viewModel.playerNames.indices.contains(index) {
-                                                                return viewModel.playerNames[index]
-                                                            }
-                                                            return ""
-                                                        },
-                                                        set: { newValue in
-                                                            viewModel.updatePlayerNames()
-                                                            if viewModel.playerNames.indices.contains(index) {
-                                                                viewModel.playerNames[index] = newValue
-                                                            }
-                                                        }
-                                                    ))
-                                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                                                    .autocorrectionDisabled()
-                                                }
-                                            }
-                                        }
-                                        .padding(.vertical, 4)
-                                    }
-                                    .frame(maxHeight: 250)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(Color.gray.opacity(0.05))
-                                    )
+                                Button("Editar") {
+                                    showingNameEditor = true
                                 }
-                                .padding(.top, 8)
+                                .font(.caption)
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
                             }
                         }
 
                         Divider()
 
-                        // Category Selection
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Categoria")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-
-                            VStack(spacing: 12) {
+                        // Categoria - Layout Grid para economizar espaço
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Categoria").font(.headline)
+                            HStack(spacing: 10) {
                                 ForEach(Category.allCases) { category in
-                                    Button(action: {
+                                    CategoryButton(
+                                        category: category,
+                                        isSelected: viewModel.selectedCategory == category,
+                                        icon: iconForCategory(category)
+                                    ) {
                                         viewModel.selectedCategory = category
                                         viewModel.triggerHaptic(.light)
-                                    }) {
-                                        HStack {
-                                            Image(systemName: iconForCategory(category))
-                                                .font(.title2)
-
-                                            Text(category.rawValue)
-                                                .font(.body)
-                                                .fontWeight(.medium)
-
-                                            Spacer()
-
-                                            if viewModel.selectedCategory == category {
-                                                Image(systemName: "checkmark.circle.fill")
-                                                    .foregroundColor(.green)
-                                                    .font(.title3)
-                                            }
-                                        }
-                                        .padding()
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(viewModel.selectedCategory == category ?
-                                                      Color.blue.opacity(0.2) : Color.gray.opacity(0.1))
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .stroke(viewModel.selectedCategory == category ?
-                                                       Color.blue : Color.clear, lineWidth: 2)
-                                        )
                                     }
-                                    .buttonStyle(PlainButtonStyle())
                                 }
                             }
                         }
                     }
-                    .padding(25)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color(.systemBackground))
-                            .shadow(radius: 10)
-                    )
+                    .padding(20)
+                    .background(RoundedRectangle(cornerRadius: 20).fill(Color(.systemBackground)))
                     .padding(.horizontal)
 
+                    Spacer() // Garante que o botão fique embaixo
+
                     // Start Button
-                    Button(action: {
-                        viewModel.startGame()
-                    }) {
+                    Button(action: { viewModel.startGame() }) {
                         HStack {
                             Image(systemName: "play.fill")
-                                .font(.title2)
                             Text("Iniciar Jogo")
-                                .font(.title2)
-                                .fontWeight(.bold)
                         }
+                        .font(.title3).bold()
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.blue, .purple],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                        )
-                        .shadow(radius: 8)
+                        .background(LinearGradient(colors: [.blue, .purple], startPoint: .leading, endPoint: .trailing))
+                        .cornerRadius(16)
                     }
                     .padding(.horizontal)
-                    .padding(.bottom, 30)
+                    .padding(.bottom, 20)
                 }
-                .padding(.vertical)
+            }
+            .sheet(isPresented: $showingNameEditor) {
+                PlayerNameEditorView(viewModel: viewModel)
             }
         }
-            .navigationBarTitleDisplayMode(.inline)
-        }
     }
 
-    // Helper function for category icons
+    // Botão de Categoria Compacto
+    @ViewBuilder
+    private func CategoryButton(category: Category, isSelected: Bool, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack {
+                Image(systemName: icon)
+                Text(category.rawValue).font(.caption2).bold()
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(isSelected ? Color.blue.opacity(0.2) : Color.gray.opacity(0.1))
+            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2))
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private func stepperButton(systemName: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.title2)
+                .foregroundColor(enabled ? .blue : .gray)
+        }
+        .disabled(!enabled)
+    }
+
     private func iconForCategory(_ category: Category) -> String {
         switch category {
-        case .comida:
-            return "fork.knife"
-        case .lugares:
-            return "map.fill"
-        case .profissoes:
-            return "briefcase.fill"
+        case .comida: return "fork.knife"
+        case .lugares: return "map.fill"
+        case .profissoes: return "briefcase.fill"
         }
     }
-
-    // Helper function for player colors
-    private func playerColor(for index: Int) -> Color {
-        let colors: [Color] = [
-            .blue, .green, .orange, .purple, .pink, .red,
-            .yellow, .cyan, .indigo, .mint, .teal, .brown
-        ]
-        return colors[index % colors.count]
-    }
 }
-
-#Preview {
-    SetupView(viewModel: GameViewModel())
-}
-
